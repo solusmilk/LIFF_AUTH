@@ -64,7 +64,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v1.2.2</div>
+            <div class="text-xs text-slate-400 font-mono">v1.3.0</div>
         </div>
 
         <!-- Main Content -->
@@ -193,21 +193,13 @@
                 class="bg-slate-900 text-slate-300 p-4 text-xs font-mono overflow-x-auto border-t border-slate-800 max-h-80 overflow-y-auto">
                 <div
                     class="mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px] flex justify-between items-center">
-                    <span>API Diagnostics</span>
-                    <span class="text-slate-600">Click link to test</span>
+                    <span>CURL Command (For Testing)</span>
                 </div>
 
-                <div v-if="debugUrl" class="mb-4 bg-slate-800 p-3 rounded break-all border border-slate-700">
-                    <p class="text-slate-400 mb-2 font-bold select-none">Last Request URL:</p>
-                    <a :href="debugUrl" target="_blank"
-                        class="text-blue-400 hover:underline hover:text-blue-300 block mb-2 break-all">{{ debugUrl
-                        }}</a>
-
-                    <div class="text-[10px] text-yellow-500/80 mt-2 bg-yellow-500/10 p-2 rounded">
-                        <span class="material-icons text-[10px] align-middle mr-1">info</span>
-                        如果點擊上方連結看到 <span class="text-white bg-red-900 px-1">紅色錯誤頁面</span>，代表後端程式崩潰。請檢查 Apps Script 日誌。
-                        <br>如果看到 <span class="text-white bg-green-900 px-1">callback({...})</span>，代表 API 正常，請檢查網路設定。
-                    </div>
+                <div v-if="debugCurl" class="mb-4 bg-slate-800 p-3 rounded break-all border border-slate-700">
+                    <p class="text-slate-400 mb-2 font-bold select-none">Copy this to terminal:</p>
+                    <code
+                        class="text-blue-400 block mb-2 break-all text-[10px] select-all font-mono">{{ debugCurl }}</code>
                 </div>
                 <div v-else class="mb-4 text-slate-600 italic">No request made yet...</div>
 
@@ -249,7 +241,7 @@
                 const user = ref(null);
                 const logs = ref([]);
                 const showDebug = ref(false);
-                const debugUrl = ref('');
+                const debugCurl = ref('');
 
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -271,7 +263,7 @@
 
                 const init = async () => {
                     try {
-                        log('Starting initialization...');
+                        log('Starting initialization (v1.3.0)...');
                         statusMessage.value = '連線到 LINE...';
 
                         await liff.init({ liffId: CONFIG.LIFF_ID });
@@ -293,79 +285,64 @@
                         log(`Got profile: ${profile.displayName}`);
 
                         statusMessage.value = '驗證身分中...';
-                        await verifyWithBackend(token, profile);
+                        await verifyWithBackendPOST(token, profile);
 
                     } catch (err) {
                         log(`Error: ${err.message}`);
                         error.value = true;
                         errorMessage.value = err.message || '發生未知錯誤';
                         loading.value = false;
-                        showDebug.value = true; // Auto open debug on error
+                        showDebug.value = true;
                     }
                 };
 
-                const verifyWithBackend = (accessToken, profile) => {
-                    return new Promise((resolve, reject) => {
-                        const callbackName = 'liff_cb_' + Date.now();
-                        let timeoutId;
+                // 改用 FETCH POST 方法
+                const verifyWithBackendPOST = async (accessToken, profile) => {
+                    try {
+                        log('Calling Backend via POST...');
 
-                        // Build URL Params
-                        const params = new URLSearchParams({
+                        const payload = {
                             access_token: accessToken,
                             user_id: profile.userId,
                             display_name: profile.displayName,
                             picture_url: profile.pictureUrl,
-                            email: profile.email || '',
-                            callback: callbackName
+                            email: profile.email || ''
+                        };
+
+                        // 產生 Debug CURL 命令方便除錯
+                        debugCurl.value = `curl -L -X POST '${CONFIG.GAS_URL}' -H 'Content-Type: text/plain;charset=utf-8' -d '${JSON.stringify(payload)}'`;
+
+                        const response = await fetch(CONFIG.GAS_URL, {
+                            method: 'POST',
+                            mode: 'cors', // 重要：啟用 CORS
+                            headers: {
+                                'Content-Type': 'text/plain;charset=utf-8', // GAS 偏好 text/plain 以避免 preflight 檢查問題
+                            },
+                            body: JSON.stringify(payload)
                         });
 
-                        const fullUrl = `${CONFIG.GAS_URL}?${params.toString()}`;
-                        debugUrl.value = fullUrl;
+                        log(`Response status: ${response.status}`);
 
-                        log(`Calling Backend via JSONP...`);
+                        if (!response.ok) {
+                            const text = await response.text();
+                            throw new Error(`Server Error (${response.status}): ${text.substring(0, 100)}`);
+                        }
 
-                        // Global Callback
-                        window[callbackName] = (response) => {
-                            clearTimeout(timeoutId);
-                            cleanup();
-                            log('Backend response received');
+                        const data = await response.json();
+                        log('Response parsed');
 
-                            if (response.success) {
-                                user.value = response.data;
-                                log(`User loaded: ${response.data.displayName}`);
-                                loading.value = false;
-                                resolve(response.data);
-                            } else {
-                                reject(new Error(response.message || '後端驗證失敗'));
-                            }
-                        };
+                        if (data.success) {
+                            user.value = data.data;
+                            log(`User loaded: ${data.data.displayName}`);
+                            loading.value = false;
+                        } else {
+                            throw new Error(data.message || '後端驗證失敗');
+                        }
 
-                        // Cleanup
-                        const cleanup = () => {
-                            delete window[callbackName];
-                            const script = document.getElementById(callbackName);
-                            if (script) document.body.removeChild(script);
-                        };
-
-                        // Timeout
-                        timeoutId = setTimeout(() => {
-                            cleanup();
-                            reject(new Error('伺服器回應逾時 (30s)'));
-                        }, 30000);
-
-                        // Insert Script
-                        const script = document.createElement('script');
-                        script.id = callbackName;
-                        script.src = fullUrl;
-                        script.onerror = () => {
-                            clearTimeout(timeoutId);
-                            cleanup();
-                            log('SCRIPT LOAD ERROR: Browser blocked the response.');
-                            reject(new Error('無法連接伺服器 (Script Load Error)'));
-                        };
-
-                        document.body.appendChild(script);
-                    });
+                    } catch (err) {
+                        log(`POST Error: ${err.message}`);
+                        throw err;
+                    }
                 };
 
                 onMounted(() => {
@@ -374,7 +351,7 @@
 
                 return {
                     loading, error, errorMessage, statusMessage,
-                    user, logs, showDebug, debugUrl,
+                    user, logs, showDebug, debugCurl,
                     closeLiff, retry
                 };
             }
