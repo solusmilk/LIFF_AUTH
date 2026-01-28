@@ -64,7 +64,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v1.2.0</div>
+            <div class="text-xs text-slate-400 font-mono">v1.2.1</div>
         </div>
 
         <!-- Main Content -->
@@ -219,17 +219,14 @@
                 const statusMessage = ref('初始化中...');
                 const user = ref(null);
                 const logs = ref([]);
-                const showDebug = ref(false); // 預設關閉 Debug 面板
+                const showDebug = ref(false);
 
-                // 日誌記錄
                 const log = (msg) => {
                     console.log(`[LIFF] ${msg}`);
                     logs.value.push(msg);
                 };
 
-                // LIFF 操作
                 const closeLiff = () => {
-                    log('Closing window...');
                     if (liff && liff.isInClient()) {
                         liff.closeWindow();
                     } else {
@@ -241,7 +238,6 @@
                     window.location.reload();
                 };
 
-                // 初始化流程
                 const init = async () => {
                     try {
                         log('Starting initialization...');
@@ -259,16 +255,19 @@
                             return;
                         }
 
-                        // 3. Get Data
-                        statusMessage.value = '取得權限資料...';
+                        // 3. Get Access Token
                         const token = liff.getAccessToken();
-                        log(`Got access token (${token.substring(0, 10)}...)`);
-
+                        log(`Got access token (${token.substring(0, 5)}...)`);
                         if (!token) throw new Error('無法取得 Access Token');
 
-                        // 4. Call Backend
+                        // 4. Get Profile (CRITICAL FIX: Pass profile to backend!)
+                        statusMessage.value = '讀取個人資料...';
+                        const profile = await liff.getProfile();
+                        log(`Got profile for: ${profile.displayName}`);
+
+                        // 5. Call Backend
                         statusMessage.value = '驗證身分中...';
-                        await verifyWithBackend(token);
+                        await verifyWithBackend(token, profile);
 
                     } catch (err) {
                         log(`Error: ${err.message}`);
@@ -278,15 +277,14 @@
                     }
                 };
 
-                // 後端通訊 (JSONP)
-                const verifyWithBackend = (accessToken) => {
+                const verifyWithBackend = (accessToken, profile) => {
                     return new Promise((resolve, reject) => {
                         const callbackName = 'liff_cb_' + Date.now();
                         let timeoutId;
 
                         log(`Calling Backend via JSONP: ${callbackName}`);
 
-                        // 設定全域 Callback
+                        // Global Callback
                         window[callbackName] = (response) => {
                             clearTimeout(timeoutId);
                             cleanup();
@@ -302,27 +300,37 @@
                             }
                         };
 
-                        // 清理函數
+                        // Cleanup
                         const cleanup = () => {
                             delete window[callbackName];
                             const script = document.getElementById(callbackName);
                             if (script) document.body.removeChild(script);
                         };
 
-                        // 設定逾時
+                        // Timeout
                         timeoutId = setTimeout(() => {
                             cleanup();
                             reject(new Error('伺服器回應逾時 (30s)'));
                         }, 30000);
 
-                        // 插入 Script 標籤
+                        // Build URL with Profile Params
+                        const params = new URLSearchParams({
+                            access_token: accessToken,
+                            user_id: profile.userId,
+                            display_name: profile.displayName,
+                            picture_url: profile.pictureUrl,
+                            email: profile.email || '',
+                            callback: callbackName
+                        });
+
+                        // Insert Script
                         const script = document.createElement('script');
                         script.id = callbackName;
-                        script.src = `${CONFIG.GAS_URL}?access_token=${encodeURIComponent(accessToken)}&callback=${callbackName}`;
+                        script.src = `${CONFIG.GAS_URL}?${params.toString()}`;
                         script.onerror = () => {
                             clearTimeout(timeoutId);
                             cleanup();
-                            reject(new Error('無法連接伺服器 (Script Load Error)'));
+                            reject(new Error('無法連接伺服器 (Script Load Error) - 請檢查後端日誌'));
                         };
 
                         document.body.appendChild(script);
