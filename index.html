@@ -103,6 +103,12 @@
 
     </div>
 
+    <!-- 版本號顯示 -->
+    <div id="version-info"
+        style="position: fixed; bottom: 10px; right: 10px; font-size: 11px; color: #999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 4px; font-family: monospace;">
+        Frontend: v1.1.0 | Backend: <span id="backend-version">-</span>
+    </div>
+
     <script>
         // ==================== 配置區 ====================
         // 請修改以下兩個值
@@ -187,6 +193,11 @@
                         window[callbackName] = (data) => {
                             cleanup();
                             console.log('API Response:', data);
+
+                            // 更新後端版本號顯示
+                            if (data.version) {
+                                document.getElementById('backend-version').textContent = data.version;
+                            }
 
                             if (data.success) {
                                 state.user = data.data;
