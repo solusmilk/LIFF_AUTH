@@ -276,8 +276,18 @@
 
                         if (!idToken) throw new Error('無法取得 ID Token');
 
+                        // 取得好友狀態 (Linked OA)
+                        let isFriend = false;
+                        try {
+                            const friendship = await liff.getFriendship();
+                            isFriend = friendship.friendFlag;
+                            log(`Friendship status: ${isFriend}`);
+                        } catch (e) {
+                            log(`Failed to get friendship: ${e.message}`);
+                        }
+
                         statusMessage.value = '驗證身分中...';
-                        await verifyWithBackendPOST(idToken);
+                        await verifyWithBackendPOST(idToken, isFriend);
 
                     } catch (err) {
                         log(`Error: ${err.message}`);
@@ -288,13 +298,14 @@
                     }
                 };
 
-                // 使用 POST 傳送 ID Token
-                const verifyWithBackendPOST = async (idToken) => {
+                // 使用 POST 傳送 ID Token 和好友狀態
+                const verifyWithBackendPOST = async (idToken, isFriend) => {
                     try {
                         log('Calling Backend via POST...');
 
                         const payload = {
-                            id_token: idToken
+                            id_token: idToken,
+                            is_friend: isFriend
                         };
 
                         // 產生 Debug CURL 命令
