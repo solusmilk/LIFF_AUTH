@@ -2,21 +2,16 @@
 <html lang="zh-TW">
 
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LIFF Login Demo</title>
-
-    <!-- LIFF SDK -->
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- LIFF SDK -->
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        [v-cloak] {
-            display: none;
-        }
-
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #3498db;
@@ -35,294 +30,236 @@
                 transform: rotate(360deg);
             }
         }
+
+        [v-cloak] {
+            display: none;
+        }
     </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
 
-    <div id="app" class="w-full max-w-md p-4">
+    <div id="app" v-cloak class="w-full max-w-md p-4">
 
         <!-- Loading State -->
         <div v-if="loading" class="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
             <div class="loader mb-4"></div>
-            <p class="text-gray-600" v-text="statusMessage"></p>
+            <p class="text-gray-600">{{ statusMessage }}</p>
+            <!-- Debug Log -->
+            <div v-if="logs.length > 0"
+                class="mt-4 w-full bg-gray-100 p-2 rounded text-xs text-gray-500 font-mono h-24 overflow-y-auto">
+                <div v-for="(log, i) in logs" :key="i">> {{ log }}</div>
+            </div>
         </div>
 
         <!-- Error State -->
-        <div v-else-if="error" class="bg-white rounded-lg shadow-lg p-8 text-center border-t-4 border-red-500">
-            <h3 class="text-xl font-bold text-red-600 mb-2">發生錯誤</h3>
-            <p class="text-gray-600 mb-4" v-text="errorMessage"></p>
-            <button @click="retry" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">重試</button>
+        <div v-else-if="error" class="bg-white rounded-lg shadow-lg p-8 text-center">
+            <div class="text-red-500 text-5xl mb-4">⚠️</div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">發生錯誤</h2>
+            <p class="text-gray-600 mb-6">{{ errorMessage }}</p>
+            <button @click="retry" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">
+                重試
+            </button>
+            <div class="mt-4 text-left bg-gray-900 text-green-400 p-2 rounded text-xs font-mono overflow-x-auto">
+                {{ errorMessage }}
+            </div>
         </div>
 
-        <!-- Success State -->
+        <!-- Success State (Profile) -->
         <div v-else-if="user" class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <!-- Header Background -->
             <div class="bg-green-500 h-24"></div>
+
+            <!-- Avatar -->
             <div class="px-6 relative">
                 <img :src="user.pictureUrl || 'https://via.placeholder.com/150'"
-                    class="w-24 h-24 rounded-full border-4 border-white absolute -top-12 shadow-md bg-white">
+                    class="w-24 h-24 rounded-full border-4 border-white absolute -top-12 shadow-md bg-white block">
             </div>
-            <div class="mt-16 px-6 pb-6">
-                <h2 class="text-2xl font-bold text-gray-800" v-text="user.displayName"></h2>
-                <p class="text-sm text-gray-500 mb-2">User ID: <span v-text="user.userId"></span></p>
-                <!-- Debug: Force Show Role -->
-                <div class="bg-gray-800 text-white p-2 text-xs rounded mb-4 font-mono overflow-auto text-left">
-                    <p>Role: "{{ user.role }}"</p>
-                    <p>Status: "{{ user.accountStatus }}"</p>
+
+            <!-- Content -->
+            <div class="mt-16 px-6 pb-6 text-center">
+                <h2 class="text-2xl font-bold text-gray-800">{{ user.displayName }}</h2>
+                <p class="text-sm text-gray-500 mb-4">{{ user.userId }}</p>
+
+                <!--  Debug Box (Explicitly shown) -->
+                <div class="bg-black text-white p-3 rounded mb-4 text-left text-xs font-mono">
+                    <p class="text-green-400 font-bold mb-1">=== DEBUG INFO ===</p>
+                    <p>Role: <span class="text-yellow-300">"{{ user.role }}"</span></p>
+                    <p>Status: <span class="text-yellow-300">"{{ user.accountStatus }}"</span></p>
+                    <p>Friend: <span class="text-yellow-300">{{ user.isFriend }}</span></p>
                 </div>
 
-                <!-- 角色標籤 (Dynamic Class Binding) -->
-                <div class="mb-4 text-center">
-                    <span class="inline-block px-3 py-1 rounded-full text-sm font-bold shadow-sm" :class="{
-                            'bg-purple-100 text-purple-800 border border-purple-200': user.role === 'admin',
-                            'bg-blue-100 text-blue-800 border border-blue-200': user.role === 'user',
-                            'bg-gray-100 text-gray-800 border border-gray-200': user.role === 'guest' || !user.role
-                        }">
-                        {{ user.role === 'admin' ? '👑 管理員' : (user.role === 'user' ? '👤 使用者' : '👁️ 訪客') }}
+                <!-- Role Badge -->
+                <div class="flex justify-center flex-wrap gap-2 mb-6">
+                    <!-- Admin -->
+                    <span v-if="user.role === 'admin'"
+                        class="px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                        👑 管理員
+                    </span>
+                    <!-- User -->
+                    <span v-else-if="user.role === 'user'"
+                        class="px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                        👤 使用者
+                    </span>
+                    <!-- Guest (Default) -->
+                    <span v-else
+                        class="px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                        👁️ 訪客 ({{ user.role || 'none' }})
                     </span>
 
+                    <!-- Pending Status -->
                     <span v-if="user.accountStatus === 'pending'"
-                        class="ml-2 inline-block px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                        class="px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
                         ⏳ 待審核
                     </span>
                 </div>
 
-                <div class="bg-green-50 rounded p-4 mb-4 border border-green-200">
-                    <p class="text-green-800 font-medium">✨ <span
-                            v-text="user.status === 'REGISTER' ? '註冊成功！' : '歡迎回來！'"></span></p>
+                <!-- Welcome Message -->
+                <div class="bg-green-50 rounded p-4 mb-4 border border-green-200 text-left">
+                    <p class="text-green-800 font-medium mb-1">
+                        ✨ {{ user.status === 'REGISTER' ? '註冊成功！' : '歡迎回來！' }}
+                    </p>
                     <p class="text-sm text-green-600">您已成功通過 Line Login 驗證。</p>
                 </div>
 
-                <!-- 管理員備註 -->
-                <div v-if="user.adminNote" class="bg-yellow-50 rounded p-4 mb-4 border border-yellow-200">
-                    <p class="text-yellow-800 font-medium mb-1">📝 管理員備註</p>
-                    <p class="text-sm text-yellow-700" v-text="user.adminNote"></p>
+                <!-- Admin Note -->
+                <div v-if="user.adminNote" class="bg-yellow-50 rounded p-4 mb-4 border border-yellow-200 text-left">
+                    <p class="text-yellow-800 font-medium mb-1 flex items-center">
+                        <span class="mr-1">📝</span> 管理員備註
+                    </p>
+                    <p class="text-sm text-yellow-700">{{ user.adminNote }}</p>
                 </div>
 
+                <!-- Close Button -->
                 <button @click="closeLiff"
-                    class="w-full bg-slate-800 text-white py-3 rounded-lg hover:bg-slate-700 transition">
+                    class="w-full bg-slate-800 text-white py-3 rounded-lg hover:bg-slate-700 transition font-medium">
                     關閉視窗
                 </button>
+            </div>
+
+            <!-- Version Footer -->
+            <div class="bg-gray-50 px-4 py-2 text-right">
+                <p class="text-xs text-gray-400 font-mono">
+                    FE: v1.2.0 | BE: <span id="be-ver">{{ backendVersion }}</span>
+                </p>
             </div>
         </div>
 
     </div>
 
-    <!-- 版本號顯示 -->
-    <div id="version-info"
-        style="position: fixed; bottom: 10px; right: 10px; font-size: 11px; color: #999; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 4px; font-family: monospace;">
-        Frontend: v1.1.0 | Backend: <span id="backend-version">-</span>
-    </div>
-
+    <!-- Application Logic -->
     <script>
-        // ==================== 配置區 ====================
-        // 請修改以下兩個值
-        const CONFIG = {
-            LIFF_ID: '2008961332-x2ESAmW0',
-            GAS_API_URL: 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEbRrWcbo-wvSLizA1dSzfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec'
-        };
-        // ==============================================
+        const { createApp, ref, onMounted } = Vue;
 
-        // Simple reactive system
-        const state = {
-            loading: true,
-            error: false,
-            errorMessage: '',
-            statusMessage: '初始化中...',
-            user: null
-        };
+        // Configuration
+        const LIFF_ID = '2008961332-x2ESAmW0';
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEBrRWcbo-wvSLizA1dSZfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec';
 
-        const app = {
-            data: state,
+        createApp({
+            setup() {
+                const loading = ref(true);
+                const error = ref(false);
+                const errorMessage = ref('');
+                const statusMessage = ref('初始化中...');
+                const user = ref(null);
+                const logs = ref([]);
+                const backendVersion = ref('-');
 
-            async init() {
-                try {
-                    console.log('Config:', CONFIG);
+                const log = (msg) => {
+                    console.log(msg);
+                    logs.value.push(msg);
+                };
 
-                    if (!CONFIG.LIFF_ID || CONFIG.LIFF_ID === 'YOUR_LIFF_ID_HERE') {
-                        throw new Error('請先設定 LIFF_ID');
+                const closeLiff = () => {
+                    if (liff.isInClient()) {
+                        liff.closeWindow();
+                    } else {
+                        window.close();
                     }
+                };
 
-                    if (!CONFIG.GAS_API_URL || CONFIG.GAS_API_URL === 'YOUR_GAS_DEPLOYMENT_URL') {
-                        throw new Error('請先設定 GAS_API_URL');
+                const retry = () => {
+                    window.location.reload();
+                };
+
+                // Main Auth Flow
+                const initLiff = async () => {
+                    try {
+                        statusMessage.value = 'LIFF 初始化中...';
+                        await liff.init({ liffId: LIFF_ID });
+
+                        if (!liff.isLoggedIn()) {
+                            statusMessage.value = '請登入...';
+                            liff.login();
+                            return;
+                        }
+
+                        statusMessage.value = '取得權限中...';
+                        const accessToken = liff.getAccessToken();
+                        const profile = await liff.getProfile(); // 雙重確認，取得 profile 確保已登入
+
+                        if (!accessToken) throw new Error('無法取得 Access Token');
+
+                        // Call Backend
+                        statusMessage.value = '驗證身份中...';
+                        await callBackend(accessToken);
+
+                    } catch (err) {
+                        console.error(err);
+                        error.value = true;
+                        errorMessage.value = err.message || '發生未知錯誤';
                     }
+                };
 
-                    this.updateStatus('初始化 LIFF...');
-                    await liff.init({ liffId: CONFIG.LIFF_ID });
-                    console.log('LIFF initialized');
-
-                    if (!liff.isLoggedIn()) {
-                        this.updateStatus('轉導至登入頁面...');
-                        liff.login({ redirectUri: window.location.href });
-                        return;
-                    }
-
-                    this.updateStatus('驗證身分中...');
-
-                    // 使用 LIFF Profile API 直接取得使用者資料
-                    const profile = await liff.getProfile();
-                    console.log('Got Profile:', profile);
-
-                    if (!profile) {
-                        throw new Error('無法取得使用者資料');
-                    }
-
-                    // 取得 Access Token（有效期較長）
-                    const accessToken = liff.getAccessToken();
-                    console.log('Got Access Token:', accessToken ? 'Yes' : 'No');
-
-                    await this.verifyBackend(profile, accessToken);
-
-                } catch (err) {
-                    console.error('Error:', err);
-                    this.showError(err.message || '初始化失敗');
-                }
-            },
-
-            async verifyBackend(profile, accessToken) {
-                try {
-                    console.log('Calling API:', CONFIG.GAS_API_URL);
-
-                    // 使用 JSONP 避免 CORS 問題
-                    const callbackName = 'liffCallback' + Date.now();
-                    const url = `${CONFIG.GAS_API_URL}?user_id=${encodeURIComponent(profile.userId)}&display_name=${encodeURIComponent(profile.displayName)}&picture_url=${encodeURIComponent(profile.pictureUrl)}&access_token=${encodeURIComponent(accessToken)}&callback=${callbackName}`;
-
+                // JSONP Backend Call
+                const callBackend = (token) => {
                     return new Promise((resolve, reject) => {
-                        // 設定 timeout
-                        const timeout = setTimeout(() => {
-                            cleanup();
-                            reject(new Error('請求超時'));
-                        }, 30000);
+                        const callbackName = 'cb_' + Date.now();
 
-                        // 定義 callback 函數
-                        window[callbackName] = (data) => {
-                            cleanup();
-                            console.log('API Response:', data);
-
-                            // 更新後端版本號顯示
-                            if (data.version) {
-                                document.getElementById('backend-version').textContent = data.version;
-                            }
-
-                            if (data.success) {
-                                state.user = data.data;
-                                state.loading = false;
-                                this.render();
-                                resolve();
-                            } else {
-                                reject(new Error(data.message || '後端驗證失敗'));
-                            }
-                        };
-
-                        // 清理函數
-                        const cleanup = () => {
-                            clearTimeout(timeout);
+                        // Define Global Callback
+                        window[callbackName] = (response) => {
+                            // Cleanup
                             delete window[callbackName];
-                            if (script.parentNode) {
-                                script.parentNode.removeChild(script);
+                            document.body.removeChild(script);
+
+                            log('Backend Responded');
+
+                            if (response.version) backendVersion.value = response.version;
+
+                            if (response.success) {
+                                user.value = response.data;
+                                loading.value = false;
+                                resolve(response.data);
+                            } else {
+                                reject(new Error(response.message || '後端驗證失敗'));
                             }
                         };
 
-                        // 建立 script 標籤
+                        // Create Script
                         const script = document.createElement('script');
+                        const url = `${GAS_URL}?access_token=${encodeURIComponent(token)}&callback=${callbackName}`;
                         script.src = url;
                         script.onerror = () => {
-                            cleanup();
-                            reject(new Error('無法連接伺服器'));
+                            delete window[callbackName];
+                            document.body.removeChild(script);
+                            reject(new Error('無法連接伺服器 (Script Error)'));
                         };
 
-                        document.head.appendChild(script);
+                        document.body.appendChild(script);
                     });
+                };
 
-                } catch (err) {
-                    console.error('Backend error:', err);
-                    throw new Error('無法連接伺服器: ' + err.message);
-                }
-            },
+                onMounted(() => {
+                    initLiff();
+                });
 
-            updateStatus(message) {
-                state.statusMessage = message;
-                this.render();
-            },
-
-            showError(message) {
-                state.error = true;
-                state.errorMessage = message;
-                state.loading = false;
-                this.render();
-            },
-
-            retry() {
-                window.location.reload();
-            },
-
-            closeLiff() {
-                if (liff.isInClient()) {
-                    liff.closeWindow();
-                } else {
-                    window.close();
-                    alert('請手動關閉視窗');
-                }
-            },
-
-            render() {
-                const appEl = document.getElementById('app');
-
-                // 清空內容
-                appEl.innerHTML = '';
-
-                if (state.loading) {
-                    // Loading State
-                    appEl.innerHTML = `
-                        <div class="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
-                            <div class="loader mb-4"></div>
-                            <p class="text-gray-600">${state.statusMessage}</p>
-                        </div>
-                    `;
-                } else if (state.error) {
-                    // Error State
-                    appEl.innerHTML = `
-                        <div class="bg-white rounded-lg shadow-lg p-8 text-center border-t-4 border-red-500">
-                            <h3 class="text-xl font-bold text-red-600 mb-2">發生錯誤</h3>
-                            <p class="text-gray-600 mb-4">${state.errorMessage}</p>
-                            <button id="retryBtn" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">重試</button>
-                        </div>
-                    `;
-                    document.getElementById('retryBtn').onclick = () => this.retry();
-                } else if (state.user) {
-                    // Success State
-                    const statusText = state.user.status === 'REGISTER' ? '註冊成功！' : '歡迎回來！';
-                    appEl.innerHTML = `
-                        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-                            <div class="bg-green-500 h-24"></div>
-                            <div class="px-6 relative">
-                                <img src="${state.user.pictureUrl || 'https://via.placeholder.com/150'}" 
-                                     class="w-24 h-24 rounded-full border-4 border-white absolute -top-12 shadow-md bg-white">
-                            </div>
-                            <div class="mt-16 px-6 pb-6">
-                                <h2 class="text-2xl font-bold text-gray-800">${state.user.displayName}</h2>
-                                <p class="text-sm text-gray-500 mb-4">User ID: <span>${state.user.userId}</span></p>
-                                
-                                <div class="bg-green-50 rounded p-4 mb-4 border border-green-200">
-                                    <p class="text-green-800 font-medium">✨ ${statusText}</p>
-                                    <p class="text-sm text-green-600">您已成功通過 Line Login 驗證。</p>
-                                </div>
-
-                                <button id="closeBtn" class="w-full bg-slate-800 text-white py-3 rounded-lg hover:bg-slate-700 transition">
-                                    關閉視窗
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    document.getElementById('closeBtn').onclick = () => this.closeLiff();
-                }
+                return {
+                    loading, error, errorMessage, statusMessage,
+                    user, logs, backendVersion,
+                    closeLiff, retry
+                };
             }
-        };
-
-        // Start app
-        document.addEventListener('DOMContentLoaded', () => {
-            app.init();
-        });
+        }).mount('#app');
     </script>
 </body>
 
