@@ -4,20 +4,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIFF Login Demo</title>
+    <title>LIFF Auth</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
     <style>
+        [v-cloak] {
+            display: none;
+        }
+
+        .slide-fade-enter-active {
+            transition: all 0.3s ease-out;
+        }
+
+        .slide-fade-leave-active {
+            transition: all 0.3s cubic-bezier(1, 0.5, 0.8, 1);
+        }
+
+        .slide-fade-enter-from,
+        .slide-fade-leave-to {
+            transform: translateY(20px);
+            opacity: 0;
+        }
+
         .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 24px;
+            height: 24px;
             animation: spin 1s linear infinite;
         }
 
@@ -30,130 +51,165 @@
                 transform: rotate(360deg);
             }
         }
-
-        [v-cloak] {
-            display: none;
-        }
     </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800">
 
-    <div id="app" v-cloak class="w-full max-w-md p-4">
+    <div id="app" v-cloak class="max-w-md mx-auto min-h-screen bg-white shadow-xl flex flex-col relative">
 
-        <!-- Loading State -->
-        <div v-if="loading" class="bg-white rounded-lg shadow-lg p-8 flex flex-col items-center">
-            <div class="loader mb-4"></div>
-            <p class="text-gray-600">{{ statusMessage }}</p>
-            <!-- Debug Log -->
-            <div v-if="logs.length > 0"
-                class="mt-4 w-full bg-gray-100 p-2 rounded text-xs text-gray-500 font-mono h-24 overflow-y-auto">
-                <div v-for="(log, i) in logs" :key="i">> {{ log }}</div>
-            </div>
+        <!-- Navbar -->
+        <div class="bg-white p-4 items-center flex justify-between border-b border-slate-100 sticky top-0 z-10">
+            <h1 class="font-bold text-lg text-slate-700 flex items-center gap-2">
+                <span class="material-icons text-blue-500">verified_user</span>
+                LIFF Auth
+            </h1>
+            <div class="text-xs text-slate-400 font-mono">v1.2.0</div>
         </div>
 
-        <!-- Error State -->
-        <div v-else-if="error" class="bg-white rounded-lg shadow-lg p-8 text-center">
-            <div class="text-red-500 text-5xl mb-4">⚠️</div>
-            <h2 class="text-xl font-bold text-gray-800 mb-2">發生錯誤</h2>
-            <p class="text-gray-600 mb-6">{{ errorMessage }}</p>
-            <button @click="retry" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">
-                重試
+        <!-- Main Content -->
+        <main class="flex-1 p-6 flex flex-col items-center justify-center relative">
+
+            <!-- Loading State -->
+            <transition name="slide-fade" mode="out-in">
+                <div v-if="loading"
+                    class="text-center w-full absolute inset-0 flex flex-col items-center justify-center bg-white z-20"
+                    key="loading">
+                    <div class="loader mb-4"></div>
+                    <p class="text-slate-500 text-sm font-medium animate-pulse">{{ statusMessage }}</p>
+                    <div class="mt-8 px-8 w-full text-xs text-slate-400 font-mono text-left opacity-60">
+                        <div v-for="(log, i) in logs.slice(-3)" :key="i" class="truncate">> {{ log }}</div>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="error" class="text-center w-full" key="error">
+                    <div
+                        class="bg-red-50 text-red-500 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                        <span class="material-icons text-4xl">error_outline</span>
+                    </div>
+                    <h2 class="text-xl font-bold text-slate-800 mb-2">發生錯誤</h2>
+                    <div class="bg-red-50 p-4 rounded-lg text-left mb-6 mx-auto max-w-xs border border-red-100">
+                        <p class="text-red-600 text-sm font-medium break-all">{{ errorMessage }}</p>
+                    </div>
+                    <button @click="retry"
+                        class="bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-700 transition active:scale-95 font-medium shadow-lg shadow-slate-200">
+                        重新嘗試
+                    </button>
+                </div>
+
+                <!-- Success State (Profile) -->
+                <div v-else-if="user" class="w-full" key="content">
+
+                    <!-- Avatar & Header -->
+                    <div class="flex flex-col items-center mb-8">
+                        <div class="relative mb-4 group">
+                            <div
+                                class="absolute -inset-1 bg-gradient-to-tr from-blue-400 to-purple-400 rounded-full blur opacity-40 group-hover:opacity-60 transition duration-200">
+                            </div>
+                            <img :src="user.pictureUrl"
+                                class="w-24 h-24 rounded-full relative border-4 border-white shadow-md object-cover">
+                            <div class="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-white"
+                                title="Online"></div>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-800">{{ user.displayName }}</h2>
+                        <p class="text-sm text-slate-400 font-mono mt-1 select-all hover:text-slate-600 cursor-pointer">
+                            {{ user.userId }}</p>
+                    </div>
+
+                    <!-- Role Badge -->
+                    <div class="flex justify-center gap-3 mb-8">
+                        <!-- Role -->
+                        <div class="flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm transition-colors"
+                            :class="{
+                                 'bg-purple-50 border-purple-100 text-purple-700': user.role === 'admin',
+                                 'bg-blue-50 border-blue-100 text-blue-700': user.role === 'user',
+                                 'bg-slate-50 border-slate-100 text-slate-600': user.role === 'guest' || !user.role
+                             }">
+                            <span class="material-icons text-lg">
+                                {{ user.role === 'admin' ? 'admin_panel_settings' : (user.role === 'user' ? 'person' :
+                                'face') }}
+                            </span>
+                            <span class="font-bold text-sm uppercase tracking-wide">
+                                {{ user.role === 'admin' ? '管理員' : (user.role === 'user' ? '使用者' : '訪客') }}
+                            </span>
+                        </div>
+
+                        <!-- Status -->
+                        <div v-if="user.accountStatus === 'pending'"
+                            class="flex items-center gap-1 px-3 py-2 rounded-full bg-yellow-50 border border-yellow-100 text-yellow-700">
+                            <span class="material-icons text-base">hourglass_empty</span>
+                            <span class="text-xs font-bold uppercase">待審核</span>
+                        </div>
+                    </div>
+
+                    <!-- Info Cards -->
+                    <div class="grid gap-4 mb-8">
+                        <!-- Welcome -->
+                        <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
+                            <span class="material-icons text-blue-500 mt-0.5">celebration</span>
+                            <div>
+                                <h3 class="font-bold text-blue-900 text-sm">歡迎回來</h3>
+                                <p class="text-blue-700 text-sm mt-1">
+                                    {{ user.status === 'REGISTER' ? '註冊成功！我們已收到您的資料。' : '您已成功通過 LIFF 驗證登入。' }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Admin Note -->
+                        <div v-if="user.adminNote"
+                            class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 flex items-start gap-3">
+                            <span class="material-icons text-yellow-600 mt-0.5">sticky_note_2</span>
+                            <div>
+                                <h3 class="font-bold text-yellow-900 text-sm">管理員備註</h3>
+                                <p class="text-yellow-800 text-sm mt-1 whitespace-pre-wrap">{{ user.adminNote }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button @click="closeLiff"
+                        class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200">
+                        關閉視窗
+                    </button>
+
+                </div>
+            </transition>
+        </main>
+
+        <!-- Debug Panel (Collapsible) -->
+        <div class="border-t border-slate-200">
+            <button @click="showDebug = !showDebug"
+                class="w-full flex items-center justify-between p-4 text-xs font-mono text-slate-400 hover:bg-slate-50 transition">
+                <span>Developer Info</span>
+                <span class="material-icons text-base transition-transform duration-200"
+                    :class="{'rotate-180': showDebug}">expand_less</span>
             </button>
-            <div class="mt-4 text-left bg-gray-900 text-green-400 p-2 rounded text-xs font-mono overflow-x-auto">
-                {{ errorMessage }}
-            </div>
-        </div>
-
-        <!-- Success State (Profile) -->
-        <div v-else-if="user" class="bg-white rounded-lg shadow-lg overflow-hidden">
-            <!-- Header Background -->
-            <div class="bg-green-500 h-24"></div>
-
-            <!-- Avatar -->
-            <div class="px-6 relative">
-                <img :src="user.pictureUrl || 'https://via.placeholder.com/150'"
-                    class="w-24 h-24 rounded-full border-4 border-white absolute -top-12 shadow-md bg-white block">
-            </div>
-
-            <!-- Content -->
-            <div class="mt-16 px-6 pb-6 text-center">
-                <h2 class="text-2xl font-bold text-gray-800">{{ user.displayName }}</h2>
-                <p class="text-sm text-gray-500 mb-4">{{ user.userId }}</p>
-
-                <!--  Debug Box (Explicitly shown) -->
-                <div class="bg-black text-white p-3 rounded mb-4 text-left text-xs font-mono">
-                    <p class="text-green-400 font-bold mb-1">=== DEBUG INFO ===</p>
-                    <p>Role: <span class="text-yellow-300">"{{ user.role }}"</span></p>
-                    <p>Status: <span class="text-yellow-300">"{{ user.accountStatus }}"</span></p>
-                    <p>Friend: <span class="text-yellow-300">{{ user.isFriend }}</span></p>
+            <div v-show="showDebug"
+                class="bg-slate-900 text-slate-300 p-4 text-xs font-mono overflow-x-auto border-t border-slate-800 max-h-60 overflow-y-auto">
+                <div class="mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px]">Current User Object
                 </div>
+                <pre class="text-green-400" v-if="user">{{ JSON.stringify(user, null, 2) }}</pre>
+                <div v-else class="text-slate-600 italic">No user data loaded</div>
 
-                <!-- Role Badge -->
-                <div class="flex justify-center flex-wrap gap-2 mb-6">
-                    <!-- Admin -->
-                    <span v-if="user.role === 'admin'"
-                        class="px-3 py-1 rounded-full text-sm font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                        👑 管理員
-                    </span>
-                    <!-- User -->
-                    <span v-else-if="user.role === 'user'"
-                        class="px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                        👤 使用者
-                    </span>
-                    <!-- Guest (Default) -->
-                    <span v-else
-                        class="px-3 py-1 rounded-full text-sm font-bold bg-gray-100 text-gray-800 border border-gray-200">
-                        👁️ 訪客 ({{ user.role || 'none' }})
-                    </span>
-
-                    <!-- Pending Status -->
-                    <span v-if="user.accountStatus === 'pending'"
-                        class="px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">
-                        ⏳ 待審核
-                    </span>
+                <div class="mt-4 mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px]">Session Logs</div>
+                <div v-for="(log, i) in logs" :key="i" class="border-l-2 border-slate-700 pl-2 mb-1">
+                    <span class="text-slate-500 mr-2">{{ i+1 }}</span>
+                    {{ log }}
                 </div>
-
-                <!-- Welcome Message -->
-                <div class="bg-green-50 rounded p-4 mb-4 border border-green-200 text-left">
-                    <p class="text-green-800 font-medium mb-1">
-                        ✨ {{ user.status === 'REGISTER' ? '註冊成功！' : '歡迎回來！' }}
-                    </p>
-                    <p class="text-sm text-green-600">您已成功通過 Line Login 驗證。</p>
-                </div>
-
-                <!-- Admin Note -->
-                <div v-if="user.adminNote" class="bg-yellow-50 rounded p-4 mb-4 border border-yellow-200 text-left">
-                    <p class="text-yellow-800 font-medium mb-1 flex items-center">
-                        <span class="mr-1">📝</span> 管理員備註
-                    </p>
-                    <p class="text-sm text-yellow-700">{{ user.adminNote }}</p>
-                </div>
-
-                <!-- Close Button -->
-                <button @click="closeLiff"
-                    class="w-full bg-slate-800 text-white py-3 rounded-lg hover:bg-slate-700 transition font-medium">
-                    關閉視窗
-                </button>
-            </div>
-
-            <!-- Version Footer -->
-            <div class="bg-gray-50 px-4 py-2 text-right">
-                <p class="text-xs text-gray-400 font-mono">
-                    FE: v1.2.0 | BE: <span id="be-ver">{{ backendVersion }}</span>
-                </p>
             </div>
         </div>
 
     </div>
 
-    <!-- Application Logic -->
+    <!-- App Logic -->
     <script>
         const { createApp, ref, onMounted } = Vue;
 
-        // Configuration
-        const LIFF_ID = '2008961332-x2ESAmW0';
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEBrRWcbo-wvSLizA1dSZfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec';
+        // ===== 配置區 =====
+        const CONFIG = {
+            LIFF_ID: '2008961332-x2ESAmW0',
+            GAS_URL: 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEBrRWcbo-wvSLizA1dSZfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec'
+        };
 
         createApp({
             setup() {
@@ -163,15 +219,18 @@
                 const statusMessage = ref('初始化中...');
                 const user = ref(null);
                 const logs = ref([]);
-                const backendVersion = ref('-');
+                const showDebug = ref(false); // 預設關閉 Debug 面板
 
+                // 日誌記錄
                 const log = (msg) => {
-                    console.log(msg);
+                    console.log(`[LIFF] ${msg}`);
                     logs.value.push(msg);
                 };
 
+                // LIFF 操作
                 const closeLiff = () => {
-                    if (liff.isInClient()) {
+                    log('Closing window...');
+                    if (liff && liff.isInClient()) {
                         liff.closeWindow();
                     } else {
                         window.close();
@@ -182,52 +241,60 @@
                     window.location.reload();
                 };
 
-                // Main Auth Flow
-                const initLiff = async () => {
+                // 初始化流程
+                const init = async () => {
                     try {
-                        statusMessage.value = 'LIFF 初始化中...';
-                        await liff.init({ liffId: LIFF_ID });
+                        log('Starting initialization...');
+                        statusMessage.value = '連線到 LINE...';
 
+                        // 1. Init LIFF
+                        await liff.init({ liffId: CONFIG.LIFF_ID });
+                        log('LIFF initialized');
+
+                        // 2. Login Check
                         if (!liff.isLoggedIn()) {
-                            statusMessage.value = '請登入...';
+                            log('User not logged in, redirecting...');
+                            statusMessage.value = '請先登入...';
                             liff.login();
                             return;
                         }
 
-                        statusMessage.value = '取得權限中...';
-                        const accessToken = liff.getAccessToken();
-                        const profile = await liff.getProfile(); // 雙重確認，取得 profile 確保已登入
+                        // 3. Get Data
+                        statusMessage.value = '取得權限資料...';
+                        const token = liff.getAccessToken();
+                        log(`Got access token (${token.substring(0, 10)}...)`);
 
-                        if (!accessToken) throw new Error('無法取得 Access Token');
+                        if (!token) throw new Error('無法取得 Access Token');
 
-                        // Call Backend
-                        statusMessage.value = '驗證身份中...';
-                        await callBackend(accessToken);
+                        // 4. Call Backend
+                        statusMessage.value = '驗證身分中...';
+                        await verifyWithBackend(token);
 
                     } catch (err) {
-                        console.error(err);
+                        log(`Error: ${err.message}`);
                         error.value = true;
                         errorMessage.value = err.message || '發生未知錯誤';
+                        loading.value = false;
                     }
                 };
 
-                // JSONP Backend Call
-                const callBackend = (token) => {
+                // 後端通訊 (JSONP)
+                const verifyWithBackend = (accessToken) => {
                     return new Promise((resolve, reject) => {
-                        const callbackName = 'cb_' + Date.now();
+                        const callbackName = 'liff_cb_' + Date.now();
+                        let timeoutId;
 
-                        // Define Global Callback
+                        log(`Calling Backend via JSONP: ${callbackName}`);
+
+                        // 設定全域 Callback
                         window[callbackName] = (response) => {
-                            // Cleanup
-                            delete window[callbackName];
-                            document.body.removeChild(script);
-
-                            log('Backend Responded');
-
-                            if (response.version) backendVersion.value = response.version;
+                            clearTimeout(timeoutId);
+                            cleanup();
+                            log('Backend response received');
 
                             if (response.success) {
                                 user.value = response.data;
+                                log(`User loaded: ${response.data.displayName} (${response.data.role})`);
                                 loading.value = false;
                                 resolve(response.data);
                             } else {
@@ -235,14 +302,27 @@
                             }
                         };
 
-                        // Create Script
-                        const script = document.createElement('script');
-                        const url = `${GAS_URL}?access_token=${encodeURIComponent(token)}&callback=${callbackName}`;
-                        script.src = url;
-                        script.onerror = () => {
+                        // 清理函數
+                        const cleanup = () => {
                             delete window[callbackName];
-                            document.body.removeChild(script);
-                            reject(new Error('無法連接伺服器 (Script Error)'));
+                            const script = document.getElementById(callbackName);
+                            if (script) document.body.removeChild(script);
+                        };
+
+                        // 設定逾時
+                        timeoutId = setTimeout(() => {
+                            cleanup();
+                            reject(new Error('伺服器回應逾時 (30s)'));
+                        }, 30000);
+
+                        // 插入 Script 標籤
+                        const script = document.createElement('script');
+                        script.id = callbackName;
+                        script.src = `${CONFIG.GAS_URL}?access_token=${encodeURIComponent(accessToken)}&callback=${callbackName}`;
+                        script.onerror = () => {
+                            clearTimeout(timeoutId);
+                            cleanup();
+                            reject(new Error('無法連接伺服器 (Script Load Error)'));
                         };
 
                         document.body.appendChild(script);
@@ -250,12 +330,12 @@
                 };
 
                 onMounted(() => {
-                    initLiff();
+                    init();
                 });
 
                 return {
                     loading, error, errorMessage, statusMessage,
-                    user, logs, backendVersion,
+                    user, logs, showDebug,
                     closeLiff, retry
                 };
             }
