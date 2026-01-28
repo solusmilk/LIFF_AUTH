@@ -69,18 +69,28 @@
                 <p class="text-xs text-red-500">Debug Role: {{ user.role }}</p>
 
                 <!-- 角色標籤 -->
-                <div class="mb-4">
+                <div class="mb-4 flex justify-center gap-2">
+                    <!-- Admin -->
                     <span v-if="user.role === 'admin'"
-                        class="inline-block bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-semibold">
+                        class="px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-800">
                         👑 管理員
                     </span>
+
+                    <!-- User -->
                     <span v-else-if="user.role === 'user'"
-                        class="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
+                        class="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
                         👤 使用者
                     </span>
-                    <span v-else
-                        class="inline-block bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm font-semibold">
-                        👁️ 訪客
+
+                    <!-- Guest (明確檢查 guest 或是 fallback) -->
+                    <span v-else class="px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800">
+                        👁️ 訪客 ({{ user.role || 'Unknown' }})
+                    </span>
+
+                    <!-- 狀態標籤 -->
+                    <span v-if="user.accountStatus === 'pending'"
+                        class="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
+                        ⏳ 待審核
                     </span>
                 </div>
 
