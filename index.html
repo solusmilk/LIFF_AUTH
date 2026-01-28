@@ -64,7 +64,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v1.4.0 (JSONP Lite)</div>
+            <div class="text-xs text-slate-400 font-mono">v1.4.1 (URL Fix)</div>
         </div>
 
         <!-- Main Content -->
@@ -221,7 +221,8 @@
         // ===== 配置區 =====
         const CONFIG = {
             LIFF_ID: '2008961332-x2ESAmW0',
-            GAS_URL: 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEBrRWcbo-wvSLizA1dSZfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec'
+            // FIXED URL (Case sensitive ID)
+            GAS_URL: 'https://script.google.com/macros/s/AKfycbzK78o86LYKbEbRrWcbo-wvSLizA1dSzfdjuDbGQOw9dsLhND9p-AvQrPs8EKTeiQ/exec'
         };
 
         createApp({
@@ -255,7 +256,7 @@
 
                 const init = async () => {
                     try {
-                        log('Starting initialization (v1.4.0 NO-TOKEN)...');
+                        log('Starting initialization (v1.4.1 URL-FIX)...');
                         statusMessage.value = '連線到 LINE...';
 
                         await liff.init({ liffId: CONFIG.LIFF_ID });
