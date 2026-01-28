@@ -64,7 +64,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v1.3.0</div>
+            <div class="text-xs text-slate-400 font-mono">v1.4.0 (JSONP Lite)</div>
         </div>
 
         <!-- Main Content -->
@@ -183,30 +183,22 @@
             <button @click="showDebug = !showDebug"
                 class="w-full flex items-center justify-between p-4 text-xs font-mono text-slate-400 hover:bg-slate-50 transition">
                 <span>Developer Info</span>
-                <div class="flex items-center gap-2">
-                    <span v-if="error" class="bg-red-500 w-2 h-2 rounded-full animate-pulse"></span>
-                    <span class="material-icons text-base transition-transform duration-200"
-                        :class="{'rotate-180': showDebug}">expand_less</span>
-                </div>
+                <span class="material-icons text-base transition-transform duration-200"
+                    :class="{'rotate-180': showDebug}">expand_less</span>
             </button>
             <div v-show="showDebug"
                 class="bg-slate-900 text-slate-300 p-4 text-xs font-mono overflow-x-auto border-t border-slate-800 max-h-80 overflow-y-auto">
-                <div
-                    class="mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px] flex justify-between items-center">
-                    <span>CURL Command (For Testing)</span>
+                <div class="mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px]">API Diagnostics</div>
+                <div v-if="debugUrl" class="mb-4 bg-slate-800 p-2 rounded break-all">
+                    <p class="text-slate-500 mb-1">Last Request URL:</p>
+                    <a :href="debugUrl" target="_blank" class="text-blue-400 hover:underline hover:text-blue-300">{{
+                        debugUrl }}</a>
+                    <p class="text-[10px] text-slate-500 mt-1">👆 點擊此連結，如果看到 callback(...)，代表 API 正常。</p>
                 </div>
-
-                <div v-if="debugCurl" class="mb-4 bg-slate-800 p-3 rounded break-all border border-slate-700">
-                    <p class="text-slate-400 mb-2 font-bold select-none">Copy this to terminal:</p>
-                    <code
-                        class="text-blue-400 block mb-2 break-all text-[10px] select-all font-mono">{{ debugCurl }}</code>
-                </div>
-                <div v-else class="mb-4 text-slate-600 italic">No request made yet...</div>
 
                 <div class="mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px]">Current User Object
                 </div>
-                <pre class="text-green-400 font-mono bg-black/20 p-2 rounded"
-                    v-if="user">{{ JSON.stringify(user, null, 2) }}</pre>
+                <pre class="text-green-400" v-if="user">{{ JSON.stringify(user, null, 2) }}</pre>
                 <div v-else class="text-slate-600 italic">No user data loaded</div>
 
                 <div class="mt-4 mb-2 text-slate-500 uppercase tracking-wider font-bold text-[10px]">Session Logs</div>
@@ -241,7 +233,7 @@
                 const user = ref(null);
                 const logs = ref([]);
                 const showDebug = ref(false);
-                const debugCurl = ref('');
+                const debugUrl = ref('');
 
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -263,7 +255,7 @@
 
                 const init = async () => {
                     try {
-                        log('Starting initialization (v1.3.0)...');
+                        log('Starting initialization (v1.4.0 NO-TOKEN)...');
                         statusMessage.value = '連線到 LINE...';
 
                         await liff.init({ liffId: CONFIG.LIFF_ID });
@@ -276,16 +268,13 @@
                             return;
                         }
 
-                        const token = liff.getAccessToken();
-                        log(`Got access token (${token.substring(0, 5)}...)`);
-                        if (!token) throw new Error('無法取得 Access Token');
-
+                        // 只取 Profile，不再依賴 Access Token 驗證
                         statusMessage.value = '讀取個人資料...';
                         const profile = await liff.getProfile();
-                        log(`Got profile: ${profile.displayName}`);
+                        log(`Got profile: ${profile.displayName} (${profile.userId})`);
 
                         statusMessage.value = '驗證身分中...';
-                        await verifyWithBackendPOST(token, profile);
+                        await verifyWithBackendJSONP(profile);
 
                     } catch (err) {
                         log(`Error: ${err.message}`);
@@ -296,53 +285,69 @@
                     }
                 };
 
-                // 改用 FETCH POST 方法
-                const verifyWithBackendPOST = async (accessToken, profile) => {
-                    try {
-                        log('Calling Backend via POST...');
+                // 改回 JSONP，但不傳 Access Token
+                const verifyWithBackendJSONP = (profile) => {
+                    return new Promise((resolve, reject) => {
+                        const callbackName = 'liff_cb_' + Date.now();
+                        let timeoutId;
 
-                        const payload = {
-                            access_token: accessToken,
+                        log(`Calling Backend via JSONP (Lite)...`);
+
+                        // Global Callback
+                        window[callbackName] = (response) => {
+                            clearTimeout(timeoutId);
+                            cleanup();
+                            log('Backend response received');
+
+                            if (response.success) {
+                                user.value = response.data;
+                                log(`User loaded: ${response.data.displayName}`);
+                                loading.value = false;
+                                resolve(response.data);
+                            } else {
+                                reject(new Error(response.message || '後端驗證失敗'));
+                            }
+                        };
+
+                        // Cleanup
+                        const cleanup = () => {
+                            delete window[callbackName];
+                            const script = document.getElementById(callbackName);
+                            if (script) document.body.removeChild(script);
+                        };
+
+                        // Timeout
+                        timeoutId = setTimeout(() => {
+                            cleanup();
+                            reject(new Error('伺服器回應逾時 (30s)'));
+                        }, 30000);
+
+                        // Build URL Params (只傳基本資料)
+                        const params = new URLSearchParams({
+                            action: 'login_lite', // 告訴後端這是輕量登入
                             user_id: profile.userId,
                             display_name: profile.displayName,
                             picture_url: profile.pictureUrl,
-                            email: profile.email || ''
-                        };
-
-                        // 產生 Debug CURL 命令方便除錯
-                        debugCurl.value = `curl -L -X POST '${CONFIG.GAS_URL}' -H 'Content-Type: text/plain;charset=utf-8' -d '${JSON.stringify(payload)}'`;
-
-                        const response = await fetch(CONFIG.GAS_URL, {
-                            method: 'POST',
-                            mode: 'cors', // 重要：啟用 CORS
-                            headers: {
-                                'Content-Type': 'text/plain;charset=utf-8', // GAS 偏好 text/plain 以避免 preflight 檢查問題
-                            },
-                            body: JSON.stringify(payload)
+                            email: profile.email || '',
+                            callback: callbackName
                         });
 
-                        log(`Response status: ${response.status}`);
+                        const fullUrl = `${CONFIG.GAS_URL}?${params.toString()}`;
+                        debugUrl.value = fullUrl;
 
-                        if (!response.ok) {
-                            const text = await response.text();
-                            throw new Error(`Server Error (${response.status}): ${text.substring(0, 100)}`);
-                        }
+                        // Insert Script
+                        const script = document.createElement('script');
+                        script.id = callbackName;
+                        script.src = fullUrl;
+                        script.onerror = () => {
+                            clearTimeout(timeoutId);
+                            cleanup();
+                            log('SCRIPT LOAD ERROR: Browser blocked the response or script failed.');
+                            reject(new Error('無法連接伺服器 (Script Load Error) - 請點擊下方 Developer Info 測試連結'));
+                        };
 
-                        const data = await response.json();
-                        log('Response parsed');
-
-                        if (data.success) {
-                            user.value = data.data;
-                            log(`User loaded: ${data.data.displayName}`);
-                            loading.value = false;
-                        } else {
-                            throw new Error(data.message || '後端驗證失敗');
-                        }
-
-                    } catch (err) {
-                        log(`POST Error: ${err.message}`);
-                        throw err;
-                    }
+                        document.body.appendChild(script);
+                    });
                 };
 
                 onMounted(() => {
@@ -351,7 +356,7 @@
 
                 return {
                     loading, error, errorMessage, statusMessage,
-                    user, logs, showDebug, debugCurl,
+                    user, logs, showDebug, debugUrl,
                     closeLiff, retry
                 };
             }
