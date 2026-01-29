@@ -12,7 +12,7 @@
     <!-- LIFF SDK -->
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <!-- Config File -->
-    <script src="config.js?v=1"></script>
+    <script src="config.js?v=2"></script>
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
@@ -66,7 +66,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v2.0.0 (ID Token/POST)</div>
+            <div class="text-xs text-slate-400 font-mono">v2.1.0 (Friend check)</div>
         </div>
 
         <!-- Main Content -->
@@ -172,11 +172,19 @@
 
                         <!-- Action Buttons -->
                         <div class="grid grid-cols-2 gap-3">
-                            <button @click="sendNotification" :disabled="sendingMsg"
+                            <!-- 好友：發送通知 -->
+                            <button v-if="user.isFriend" @click="sendNotification" :disabled="sendingMsg"
                                 class="bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-[0.99] shadow-md shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                                 <span v-if="sendingMsg" class="loader w-4 h-4 border-white border-t-transparent"></span>
                                 <span v-else class="material-icons text-sm">notifications_active</span>
                                 <span class="text-xs">{{ sendingMsg ? '發送中...' : '測試通知' }}</span>
+                            </button>
+
+                            <!-- 非好友：加入好友 -->
+                            <button v-else @click="addFriend"
+                                class="bg-[#06C755] text-white py-3 rounded-xl font-bold hover:bg-[#05b34c] transition active:scale-[0.99] shadow-md shadow-green-100 flex items-center justify-center gap-2">
+                                <span class="material-icons text-sm">person_add</span>
+                                <span class="text-xs">加入好友</span>
                             </button>
 
                             <button @click="closeLiff"
@@ -185,8 +193,6 @@
                             </button>
                         </div>
                     </div>
-
-                    <!-- 原關閉按鈕已整合至上方 -->
 
                 </div>
             </transition>
@@ -244,7 +250,6 @@
                 const showDebug = ref(false);
                 const debugCurl = ref('');
 
-
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
                     if (typeof LIFF_CONFIG !== 'undefined' && LIFF_CONFIG.DEBUG_MODE) {
@@ -265,13 +270,18 @@
                     window.location.reload();
                 };
 
+                const addFriend = () => {
+                    // 跳轉至加入好友頁面
+                    window.location.href = 'https://line.me/R/ti/p/@216vzioo';
+                };
+
                 const init = async () => {
                     try {
                         if (typeof LIFF_CONFIG === 'undefined') {
                             throw new Error('找不到設定檔 config.js');
                         }
 
-                        log('Starting initialization (v2.0 ID-TOKEN)...');
+                        log('Starting initialization (v2.1.0 FriendCheck)...');
                         statusMessage.value = '連線到 LINE...';
 
                         await liff.init({ liffId: LIFF_CONFIG.LIFF_ID });
@@ -353,7 +363,6 @@
 
                     } catch (err) {
                         log(`POST Error: ${err.message}`);
-                        // 如果 POST 失敗，顯示更友善的訊息
                         if (err.message.includes('Failed to fetch')) {
                             throw new Error('無法連接伺服器 (CORS/Network Error)。請確認 Apps Script 部署網址是否正確。');
                         }
@@ -408,7 +417,7 @@
                 return {
                     loading, sendingMsg, error, errorMessage, statusMessage,
                     user, logs, showDebug, debugCurl,
-                    closeLiff, retry, sendNotification
+                    closeLiff, retry, sendNotification, addFriend
                 };
             }
         }).mount('#app');
