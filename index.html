@@ -391,6 +391,15 @@
 
                     } catch (err) {
                         log(`POST Error: ${err.message}`);
+
+                        // Error Handling for Desktop/External Browser
+                        if (!liff.isInClient() && (err.message.includes('ID Token') || err.message.includes('後端驗證失敗'))) {
+                            error.value = true;
+                            errorMessage.value = '電腦版/外部瀏覽器登入受限，請使用手機 LINE App 開啟此頁面以獲得完整體驗。';
+                            loading.value = false;
+                            return; // Stop further processing
+                        }
+
                         if (err.message.includes('Failed to fetch')) {
                             throw new Error('無法連接伺服器 (CORS/Network Error)。請確認 Apps Script 部署網址是否正確。');
                         }
