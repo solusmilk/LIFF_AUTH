@@ -169,12 +169,24 @@
                                 <p class="text-yellow-800 text-sm mt-1 whitespace-pre-wrap">{{ user.adminNote }}</p>
                             </div>
                         </div>
+
+                        <!-- Action Buttons -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="sendNotification" :disabled="sendingMsg"
+                                class="bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-[0.99] shadow-md shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                <span v-if="sendingMsg" class="loader w-4 h-4 border-white border-t-transparent"></span>
+                                <span v-else class="material-icons text-sm">notifications_active</span>
+                                <span class="text-xs">{{ sendingMsg ? '發送中...' : '測試通知' }}</span>
+                            </button>
+
+                            <button @click="closeLiff"
+                                class="bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200 text-xs">
+                                關閉視窗
+                            </button>
+                        </div>
                     </div>
 
-                    <button @click="closeLiff"
-                        class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200">
-                        關閉視窗
-                    </button>
+                    <!-- 原關閉按鈕已整合至上方 -->
 
                 </div>
             </transition>
@@ -223,6 +235,7 @@
         createApp({
             setup() {
                 const loading = ref(true);
+                const sendingMsg = ref(false); // New state for message sending
                 const error = ref(false);
                 const errorMessage = ref('');
                 const statusMessage = ref('初始化中...');
@@ -230,6 +243,7 @@
                 const logs = ref([]);
                 const showDebug = ref(false);
                 const debugCurl = ref('');
+
 
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -347,14 +361,54 @@
                     }
                 };
 
+                // 發送測試通知 (Push Message)
+                const sendNotification = async () => {
+                    if (!user.value || sendingMsg.value) return;
+
+                    try {
+                        sendingMsg.value = true;
+                        log('Requesting test notification...');
+
+                        const idToken = liff.getIDToken();
+                        if (!idToken) throw new Error('無法取得 ID Token，請重新登入');
+
+                        const payload = {
+                            action: 'send_test_msg',
+                            id_token: idToken
+                        };
+
+                        const response = await fetch(LIFF_CONFIG.GAS_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error('Server Error');
+                        const data = await response.json();
+
+                        if (data.success) {
+                            alert('✅ 測試訊息已發送！\n請檢查您的 LINE 聊天室。\n(如果沒收到，可能是被封鎖了)');
+                            log('Test message sent successfully');
+                        } else {
+                            throw new Error(data.message || '發送失敗');
+                        }
+
+                    } catch (e) {
+                        alert('❌ 發送失敗: ' + e.message);
+                        log('Send msg error: ' + e.message);
+                    } finally {
+                        sendingMsg.value = false;
+                    }
+                };
+
                 onMounted(() => {
                     init();
                 });
 
                 return {
-                    loading, error, errorMessage, statusMessage,
+                    loading, sendingMsg, error, errorMessage, statusMessage,
                     user, logs, showDebug, debugCurl,
-                    closeLiff, retry
+                    closeLiff, retry, sendNotification
                 };
             }
         }).mount('#app');
