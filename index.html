@@ -174,11 +174,18 @@
                         <div class="grid grid-cols-2 gap-3">
                             <!-- 好友：發送通知 -->
                             <template v-if="user.isFriend">
-                                <!-- 免費通知 (Reverse Trigger) -->
-                                <button @click="sendFreeNotification"
-                                    class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-3 rounded-xl font-bold hover:from-emerald-600 hover:to-teal-600 transition active:scale-[0.99] shadow-md shadow-emerald-100 flex items-center justify-center gap-2 col-span-2">
+                                <!-- 免費通知 (Reverse Trigger) - 僅限 LINE App 內 -->
+                                <button @click="sendFreeNotification" :disabled="!isInLiff"
+                                    :class="{'opacity-50 cursor-not-allowed grayscale': !isInLiff}"
+                                    class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-3 rounded-xl font-bold hover:from-emerald-600 hover:to-teal-600 transition active:scale-[0.99] shadow-md shadow-emerald-100 flex items-center justify-center gap-2 col-span-2 relative group">
                                     <span class="material-icons text-sm">try_sms_star</span>
                                     <span class="text-xs">免費通知測試 (推薦)</span>
+
+                                    <!-- Tooltip for External Browser -->
+                                    <div v-if="!isInLiff"
+                                        class="absolute bottom-full mb-2 w-48 bg-slate-800 text-white text-[10px] rounded p-2 hidden group-hover:block mx-auto z-10">
+                                        此功能需使用 Reply API，請在 LINE App 內開啟以使用。
+                                    </div>
                                 </button>
 
                                 <!-- 付費通知 (Push Message) -->
