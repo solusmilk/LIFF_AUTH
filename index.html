@@ -111,7 +111,7 @@
                             <div
                                 class="absolute -inset-1 bg-gradient-to-tr from-blue-400 to-purple-400 rounded-full blur opacity-40 group-hover:opacity-60 transition duration-200">
                             </div>
-                            <img :src="user.pictureUrl"
+                            <img :src="user.pictureUrl || 'https://via.placeholder.com/150'"
                                 class="w-24 h-24 rounded-full relative border-4 border-white shadow-md object-cover">
                             <div class="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-white"
                                 title="Online"></div>
@@ -264,7 +264,7 @@
 
     <!-- App Logic -->
     <script>
-        const { createApp, ref, onMounted } = Vue;
+        const { createApp, ref, onMounted, computed } = Vue;
 
         createApp({
             setup() {
@@ -277,6 +277,11 @@
                 const logs = ref([]);
                 const showDebug = ref(false);
                 const debugCurl = ref('');
+
+                // Helper to check environment
+                const isInLiff = computed(() => {
+                    return liff && liff.isInClient();
+                });
 
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -352,6 +357,45 @@
 
                 // 使用 POST 傳送 ID Token 和好友狀態
                 const verifyWithBackendPOST = async (idToken, isFriend) => {
+                    // 執行 Web Fallback 的輔助函式
+                    const doWebFallback = (reason) => {
+                        console.warn(`Fallback triggered: ${reason}`);
+                        log(`⚠️ Web Fallback: ${reason}`);
+
+                        let profile = liff.getDecodedIDToken();
+
+                        // 如果 SDK 解碼失敗，嘗試手動解碼 (Simple JWT parse)
+                        if (!profile && idToken) {
+                            try {
+                                const base64Url = idToken.split('.')[1];
+                                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                                const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+                                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                                }).join(''));
+                                profile = JSON.parse(jsonPayload);
+                                log('Manual JWT decode success');
+                            } catch (e) {
+                                log('Manual JWT decode failed');
+                            }
+                        }
+
+                        // 如果還是沒有 profile，則建立假資料
+                        if (!profile) {
+                            profile = { sub: 'web-guest', name: 'Web Guest', picture: '' };
+                        }
+
+                        user.value = {
+                            userId: profile.sub,
+                            displayName: profile.name,
+                            pictureUrl: profile.picture,
+                            status: 'GUEST (Web)',
+                            role: 'guest',
+                            isFriend: isFriend,
+                            adminNote: `Web 端訪客\nReason: ${reason}`
+                        };
+                        loading.value = false;
+                    };
+
                     try {
                         log('Calling Backend via POST...');
 
@@ -365,7 +409,6 @@
 
                         const response = await fetch(LIFF_CONFIG.GAS_URL, {
                             method: 'POST',
-                            // 關鍵：使用 text/plain 避免 OPTIONS Preflight 導致 CORS 錯誤
                             headers: {
                                 'Content-Type': 'text/plain;charset=utf-8',
                             },
@@ -375,22 +418,38 @@
                         log(`Response status: ${response.status}`);
 
                         if (!response.ok) {
+                            // 若 Server Error (500) 且是 Web，則 Fallback
+                            if (!isInLiff.value) {
+                                doWebFallback(`Server Error ${response.status}`);
+                                return;
+                            }
                             throw new Error(`Server Error (${response.status})`);
                         }
 
                         const data = await response.json();
-                        log('Response parsed');
 
                         if (data.success) {
                             user.value = data.data;
                             log(`User loaded: ${data.data.displayName}`);
                             loading.value = false;
                         } else {
+                            // 若 API 回傳失敗 (例如 ID Token 無效) 且是 Web，則 Fallback
+                            if (!isInLiff.value) {
+                                doWebFallback(`Backend Reject: ${data.message}`);
+                                return;
+                            }
                             throw new Error(data.message || '後端驗證失敗');
                         }
 
                     } catch (err) {
-                        log(`POST Error: ${err.message}`);
+                        log(`Backend Verify Error: ${err.message}`);
+
+                        // 針對 Network Error 或 CORS 錯誤進行 Fallback
+                        if (!isInLiff.value) {
+                            doWebFallback(`Network/Client Error: ${err.message}`);
+                            return;
+                        }
+
                         if (err.message.includes('Failed to fetch')) {
                             throw new Error('無法連接伺服器 (CORS/Network Error)。請確認 Apps Script 部署網址是否正確。');
                         }
@@ -466,7 +525,7 @@
 
                 return {
                     loading, sendingMsg, error, errorMessage, statusMessage,
-                    user, logs, showDebug, debugCurl,
+                    user, logs, showDebug, debugCurl, isInLiff,
                     closeLiff, retry, sendNotification, sendFreeNotification, addFriend
                 };
             }
