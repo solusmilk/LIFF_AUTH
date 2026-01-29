@@ -173,24 +173,45 @@
                         <!-- Action Buttons -->
                         <div class="grid grid-cols-2 gap-3">
                             <!-- 好友：發送通知 -->
-                            <button v-if="user.isFriend" @click="sendNotification" :disabled="sendingMsg"
-                                class="bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-[0.99] shadow-md shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                <span v-if="sendingMsg" class="loader w-4 h-4 border-white border-t-transparent"></span>
-                                <span v-else class="material-icons text-sm">notifications_active</span>
-                                <span class="text-xs">{{ sendingMsg ? '發送中...' : '測試通知' }}</span>
-                            </button>
+                            <template v-if="user.isFriend">
+                                <!-- 免費通知 (Reverse Trigger) -->
+                                <button @click="sendFreeNotification"
+                                    class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white py-3 rounded-xl font-bold hover:from-emerald-600 hover:to-teal-600 transition active:scale-[0.99] shadow-md shadow-emerald-100 flex items-center justify-center gap-2 col-span-2">
+                                    <span class="material-icons text-sm">try_sms_star</span>
+                                    <span class="text-xs">免費通知測試 (推薦)</span>
+                                </button>
+
+                                <!-- 付費通知 (Push Message) -->
+                                <button @click="sendNotification" :disabled="sendingMsg"
+                                    class="bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition active:scale-[0.99] shadow-md shadow-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-0.5">
+                                    <div class="flex items-center gap-1">
+                                        <span v-if="sendingMsg"
+                                            class="loader w-3 h-3 border-white border-t-transparent"></span>
+                                        <span v-else class="material-icons text-sm">notifications</span>
+                                        <span class="text-xs">{{ sendingMsg ? '發送中...' : '付費通知' }}</span>
+                                    </div>
+                                    <span class="text-[9px] opacity-70 font-mono">(扣額度)</span>
+                                </button>
+
+                                <button @click="closeLiff"
+                                    class="bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200 text-xs flex flex-col items-center justify-center">
+                                    <span>關閉視窗</span>
+                                </button>
+                            </template>
 
                             <!-- 非好友：加入好友 -->
-                            <button v-else @click="addFriend"
-                                class="bg-[#06C755] text-white py-3 rounded-xl font-bold hover:bg-[#05b34c] transition active:scale-[0.99] shadow-md shadow-green-100 flex items-center justify-center gap-2">
-                                <span class="material-icons text-sm">person_add</span>
-                                <span class="text-xs">加入好友</span>
-                            </button>
+                            <template v-else>
+                                <button @click="addFriend"
+                                    class="bg-[#06C755] text-white py-3 rounded-xl font-bold hover:bg-[#05b34c] transition active:scale-[0.99] shadow-md shadow-green-100 flex items-center justify-center gap-2 col-span-2">
+                                    <span class="material-icons text-sm">person_add</span>
+                                    <span class="text-xs">加入好友</span>
+                                </button>
 
-                            <button @click="closeLiff"
-                                class="bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200 text-xs">
-                                關閉視窗
-                            </button>
+                                <button @click="closeLiff"
+                                    class="bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition active:scale-[0.99] shadow-lg shadow-slate-200 text-xs col-span-2">
+                                    關閉視窗
+                                </button>
+                            </template>
                         </div>
                     </div>
 
@@ -410,6 +431,28 @@
                     }
                 };
 
+                // 發送免費通知 (Reverse Trigger)
+                const sendFreeNotification = async () => {
+                    if (!liff.isInClient()) {
+                        alert('此功能僅限在 LINE App 內使用 (需使用 Reply API)');
+                        return;
+                    }
+                    try {
+                        log('Sending free notification command...');
+                        await liff.sendMessages([
+                            {
+                                type: 'text',
+                                text: 'cmd:free_notify'  // 隱藏指令
+                            }
+                        ]);
+                        //alert('✅ 免費通知請求已送出！\n機器人應該會馬上回覆您。');
+                        liff.closeWindow(); // 直接關閉視窗讓使用者看回應
+                    } catch (error) {
+                        log('Send free msg failed: ' + error);
+                        alert('發送失敗，請確認您已授權 "傳送訊息到聊天室" 的權限。');
+                    }
+                };
+
                 onMounted(() => {
                     init();
                 });
@@ -417,7 +460,7 @@
                 return {
                     loading, sendingMsg, error, errorMessage, statusMessage,
                     user, logs, showDebug, debugCurl,
-                    closeLiff, retry, sendNotification, addFriend
+                    closeLiff, retry, sendNotification, sendFreeNotification, addFriend
                 };
             }
         }).mount('#app');
