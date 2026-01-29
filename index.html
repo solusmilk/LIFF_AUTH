@@ -66,7 +66,7 @@
                 <span class="material-icons text-blue-500">verified_user</span>
                 LIFF Auth
             </h1>
-            <div class="text-xs text-slate-400 font-mono">v2.2.0 (Friend check)</div>
+            <div class="text-xs text-slate-400 font-mono">v2.1.0 (Friend check)</div>
         </div>
 
         <!-- Main Content -->
@@ -277,7 +277,6 @@
                 const logs = ref([]);
                 const showDebug = ref(false);
                 const debugCurl = ref('');
-                const isInLiff = ref(false); // define reactive variable
 
                 const log = (msg) => {
                     const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -316,9 +315,6 @@
                         await liff.init({ liffId: LIFF_CONFIG.LIFF_ID });
                         log('LIFF initialized');
 
-                        // Set isInLiff value
-                        isInLiff.value = liff.isInClient();
-
                         if (!liff.isLoggedIn()) {
                             log('User not logged in, redirecting...');
                             statusMessage.value = '請先登入...';
@@ -347,13 +343,6 @@
 
                     } catch (err) {
                         log(`Error: ${err.message}`);
-
-                        // Error Handling for Desktop/External Browser - Relaxed for new login logic
-                        if (!isInLiff.value && (err.message.includes('ID Token') || err.message.includes('後端驗證失敗'))) {
-                            // Optional: Still show a hint if login fails on desktop
-                            log('Desktop login failed, might need LINE App for full features.');
-                        }
-
                         error.value = true;
                         errorMessage.value = err.message || '發生未知錯誤';
                         loading.value = false;
@@ -365,11 +354,11 @@
                 const verifyWithBackendPOST = async (idToken, isFriend) => {
                     try {
                         log('Calling Backend via POST...');
-
+                        
                         // 取得 User ID 與 Access Token (增強驗證成功率)
                         const decoded = liff.getDecodedIDToken();
                         const accessToken = liff.getAccessToken();
-
+                        
                         const payload = {
                             id_token: idToken,
                             access_token: accessToken, // 加入 Access Token
@@ -408,7 +397,7 @@
 
                     } catch (err) {
                         log(`POST Error: ${err.message}`);
-
+                        
                         if (err.message.includes('Failed to fetch')) {
                             throw new Error('無法連接伺服器 (CORS/Network Error)。請確認 Apps Script 部署網址是否正確。');
                         }
@@ -502,7 +491,7 @@
 
                 return {
                     loading, sendingMsg, error, errorMessage, statusMessage,
-                    user, logs, showDebug, debugCurl, isInLiff, // Return isInLiff
+                    user, logs, showDebug, debugCurl,
                     closeLiff, retry, sendNotification, sendFreeNotification, addFriend
                 };
             }
