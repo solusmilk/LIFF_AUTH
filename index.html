@@ -354,11 +354,11 @@
                 const verifyWithBackendPOST = async (idToken, isFriend) => {
                     try {
                         log('Calling Backend via POST...');
-                        
+
                         // 取得 User ID 與 Access Token (增強驗證成功率)
                         const decoded = liff.getDecodedIDToken();
                         const accessToken = liff.getAccessToken();
-                        
+
                         const payload = {
                             id_token: idToken,
                             access_token: accessToken, // 加入 Access Token
@@ -397,7 +397,7 @@
 
                     } catch (err) {
                         log(`POST Error: ${err.message}`);
-                        
+
                         if (err.message.includes('Failed to fetch')) {
                             throw new Error('無法連接伺服器 (CORS/Network Error)。請確認 Apps Script 部署網址是否正確。');
                         }
