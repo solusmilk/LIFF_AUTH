@@ -445,15 +445,33 @@
                         return;
                     }
                     try {
-                        log('Sending free notification command...');
+                        log('Sending free notification command (Flex)...');
                         await liff.sendMessages([
                             {
-                                type: 'text',
-                                text: 'cmd:free_notify'  // 隱藏指令
+                                type: 'flex',
+                                altText: 'cmd:free_notify', // 隱藏指令放在這裡
+                                contents: {
+                                    "type": "bubble",
+                                    "size": "nano",
+                                    "body": {
+                                        "type": "box",
+                                        "layout": "vertical",
+                                        "contents": [
+                                            {
+                                                "type": "text",
+                                                "text": "🔔 請求系統通知...",
+                                                "size": "xs",
+                                                "color": "#888888",
+                                                "align": "center"
+                                            }
+                                        ],
+                                        "backgroundColor": "#f0f0f0",
+                                        "paddingAll": "md"
+                                    }
+                                }
                             }
                         ]);
-                        //alert('✅ 免費通知請求已送出！\n機器人應該會馬上回覆您。');
-                        liff.closeWindow(); // 直接關閉視窗讓使用者看回應
+                        liff.closeWindow();
                     } catch (error) {
                         log('Send free msg failed: ' + error);
                         alert('發送失敗，請確認您已授權 "傳送訊息到聊天室" 的權限。');
